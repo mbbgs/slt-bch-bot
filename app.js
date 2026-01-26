@@ -1,21 +1,16 @@
-// webhook-server.js
 import express from 'express';
-import { GreenApi } from '@green-api/whatsapp-api-client-js-v2';
-import dotenv from 'dotenv';
-
-dotenv.config();
+import { isGreenApi } from './middlewares/mh.js'
+import { messageHandler } from './core/command.js';
 
 const app = express();
 app.use(express.json());
 
-const client = new GreenApi({
-  idInstance: process.env.ID_INSTANCE, // e.g. 1101xxxx@1
-  apiTokenInstance: process.env.API_TOKEN_INSTANCE,
-});
 
 // -------------------------------
-//    YOUR WEBHOOK ENDPOINT
+//    GREEN-API WEBHOOK ENDPOINT
 // -------------------------------
+
+app.use(isGreenApi(process.env.WEBHOOK_SECRET)())
 
 
 app.post('/webhook', async (req, res) => {
@@ -26,37 +21,70 @@ app.post('/webhook', async (req, res) => {
     const type = body?.typeWebhook;
     
     if (type === 'incomingMessageReceived') {
-      const sender = body.senderData?.sender; // e.g. 234xxxxxxxxxx@c.us
-      const text = body.messageData?.textMessageData?.textMessage;
+      const messageData = body?.messageData;
+      const senderData = body?.senderData;
       
-      console.log(`Message from ${sender}: ${text}`);
-      
-      // Optional: auto-reply example
-      if (text?.toLowerCase().includes('hello')) {
-        await client.sendMessage(sender, 'Hi there! How can I help? 😊');
+      if (!messageData || !senderData) {
+        console.log('Incomplete incoming message — ignoring');
+        return res.sendStatus(200);
       }
+      
+      const sender = senderData.sender;
+      const chatId = senderData.chatId || sender;
+      
+      // Handle only text messages for now
+      let text = null;
+      let quotedMessageId = null;
+      
+      if (messageData.typeMessage === 'textMessage') {
+        text = messageData.textMessageData?.textMessage;
+      } else if (messageData.typeMessage === 'extendedTextMessage') {
+        // quoted / forwarded / long text
+        text = messageData.extendedTextMessageData?.text;
+        quotedMessageId = messageData.extendedTextMessageData?.quotedMessage?.idMessage;
+      }
+      
+      if (!text?.trim()) {
+        console.log('No text content in message — skipping');
+        return res.sendStatus(200);
+      }
+      
+      console.log(`Processing message from ${sender} in \( {chatId}: " \){text}"`);
+      
+      // Forward to your command handler
+      await messageHandler(
+        text,
+        chatId,
+        sender,
+        quotedMessageId
+      );
     }
     
     else if (type === 'outgoingMessageStatus') {
-      console.log('Message status update:', body);
-      // e.g. sent, delivered, read, failed
+      console.log('Outgoing status:', body?.status, body?.idMessage);
     }
     
     else if (type === 'stateInstanceChanged') {
-      console.log('Instance state changed:', body.stateInstance);
+      console.log('Instance state →', body?.stateInstance);
+    }
+    
+    else {
+      console.log('Unhandled webhook type:', type);
     }
     
     res.sendStatus(200);
   } catch (err) {
-    console.error('Webhook error:', err);
+    console.error('Webhook handler crashed:', err.message);
     res.sendStatus(200);
   }
 });
 
-
-app.get('/health', (req, res) => res.send('Webhook server is alive 🚀'));
+app.get('/health', (req, res) => {
+  res.send('Webhook server is alive 🚀');
+});
 
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => {
-  console.log(`Webhook server listening on port ${PORT}`);
+  console.log(`Webhook server listening → http://localhost:${PORT}`);
+  console.log('Ready for Green-API events on /webhook');
 });

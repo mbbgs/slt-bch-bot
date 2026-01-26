@@ -1,43 +1,127 @@
-export function messageHandler(text = "", group) {
-  const trimmed = text.trim();
-  if (!trimmed) return;
+import Group from '../models/group.js'
+import Green from '../models/greenapi.js'
+import { isDev, getRandomNaughty, MESSAGES, getHelp, loadClient } from '../helpers/utils.js'
+
+
+export async function messageHandler(text = "", chatId = null, sender = null, quotedMessageId = null) {
+  if (!text?.trim()) return;
   
+  const client = loadClient();
+  if (!client) {
+    console.error('[FATAL] No client → message ignored');
+    return;
+  }
+  
+  const group = new Group(client, process.env.SPOTTFEHLER)
+  
+  const trimmed = text.trim();
   const parts = trimmed.split(/\s+/);
   const cmd = parts[0].toLowerCase();
   
   switch (cmd) {
-    case '^set':
-    case '^schedule':
-    case '^add':
+    case '^hun':
+      if (!isDev(sender)) await client.sendMessage(chatId, 'You are not my hun 🌚😒')
+      if (group != null) {
+        await group.loadGroup().catch(err => console.error('[GROUP] Load failed:', err));
+        await client.sendMessage(chatId, MESSAGES.HUN)
+      }
+      break
+    case '^help':
+      await client.replyMessage(chatId, quotedMessageId, getHelp());
+      break;
       
-      // expect: !set "Team Meeting" 14:30 "Discuss Q1 targets" "Conference Room A"
-      // Very basic parsing – in real bot use better arg parser
-      const title = parts[1]?.replace(/^["']|["']$/g, '');
-      const time = parts[2];
-      const ven = parts.slice(3).join(' ').replace(/^["']|["']$/g, '') || '';
-      
-      if (!title || !time) {
-        // reply "Usage: !set \"Title\" HH:MM \"description\""
+    case '^checkup':
+    case '^diag':
+      if (!isDev(sender)) {
+        await client.replyMessage(chatId, quotedMessageId, MESSAGES.NOT_DEV);
         return;
       }
       
-      group.setReminder({ title, time, venue: ven }).then(result => {
-        // send result.message to group chat
-      });
+      try {
+        //const apiStatus = await client.checkConnection?.() ?? true;
+        //const groupLoaded = !!group.groupMetadata;
+        
+        let statusMsg = MESSAGES.CHECKUP_OK;
+        //statusMsg += `\n• GreenAPI: ${apiStatus ? 'ALIVE' : 'DEAD'}`;
+        //statusMsg += `\n• Group cache: ${groupLoaded ? 'LOADED' : 'GHOST'}`;
+        statusMsg += `\n• Uptime: ${(process.uptime() / 60).toFixed(1)} min`;
+        statusMsg += `\n• Memory: ${(process.memoryUsage().heapUsed / 1024 / 1024).toFixed(1)} MB`;
+        
+        await client.sendMessage(chatId, "```" + statusMsg + "```");
+      } catch (err) {
+        await client.sendMessage(chatId, "```" + MESSAGES.CHECKUP_FAIL + "\n" + err.message + "```");
+      }
       break;
       
-    case '!upcoming':
-    case '!reminders':
-      group.remainder().then(tasks => {
-        if (tasks.length === 0) {
-          // send "No upcoming events today"
-        } else {
-          // format nice list
+    case '^ta':
+      if (!group.isAdmin(sender)) {
+        await client.replyMessage(chatId, quotedMessageId, MESSAGES.NOT_ADMIN);
+        return;
+      }
+      const tagMsg = parts.slice(1).join(' ') || "Jetzt ist der Fürher hier！📢";
+      await client.tagAllMembers(chatId, tagMsg);
+      break;
+      
+    case '^ssch': {
+      if (!group.isAdmin(sender)) {
+        await client.replyMessage(chatId, quotedMessageId, MESSAGES.NOT_ADMIN);
+        return;
+      }
+      
+      const args = trimmed.slice(cmd.length).trim();
+      const match = args.match(/^(.+?)\s+(\d{1,2}:\d{2})\s*(.*)$/s);
+      
+      if (!match) {
+        await client.sendMessage(chatId, 'Usage: ^ssch "Team Standup" 14:30 "Discord VC"');
+        return;
+      }
+      
+      const [, titleRaw, time, venueRaw] = match;
+      const title = titleRaw.trim().replace(/^["']|["']$/g, '');
+      const venue = venueRaw.trim().replace(/^["']|["']$/g, '');
+      
+      try {
+        const result = await group.setReminder({ title, time, venue });
+        await client.sendMessage(chatId, result.message || "Schedule locked in 🗓️");
+      } catch (err) {
+        await client.sendMessage(chatId, `Schedule write failed: ${err.message}`);
+      }
+      break;
+    }
+    
+    case '^gsch':
+      try {
+        const filter = parts[1]?.toLowerCase() === 'a' ? 'all' : 'today';
+        const tasks = await group.remainder(filter);
+        
+        if (!tasks?.length) {
+          await client.sendMessage(chatId, filter === 'all' ?
+            "Zero schedules in the database rn 🫥" :
+            "Nothing cooking today, nigga")
+          return;
         }
-      });
+        
+        let msg = "```SCHEDULE DROP:\n\n";
+        tasks.forEach(t => {
+          msg += `→ ${t.title} @ ${t.time}`;
+          if (t.venue) msg += ` (${t.venue})`;
+          msg += "\n";
+        });
+        msg += "```";
+        
+        await client.sendMessage(chatId, msg);
+      } catch (err) {
+        await client.sendMessage(chatId, "```Failed to fetch schedules. RIP db```");
+      }
       break;
       
     default:
-      // unknown command
+      if (Math.random() > 0.3) {
+        const reply = getRandomNaughty();
+        await client.sendMessage(chatId, reply);
+      } else {
+        await client.sendMessage(chatId, "Command not found bruv, try ^help");
+      }
+      break;
   }
 }

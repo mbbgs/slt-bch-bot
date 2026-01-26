@@ -1,8 +1,8 @@
-export class Group {
-  constructor(restAPI) {
+export default class Group {
+  constructor(restAPI, SPOTTFEHLER = "") {
     this.restAPI = restAPI;
-    this.SCHEDULE_FILE_PATH = "./schedules.json";
-    this.SPOTTFEHLER = "9130062961@c.us";
+    this.SCHEDULE_FILE_PATH = "./db/group.json";
+    this.SPOTTFEHLER = SPOTTFEHLER;
     this.GROUP_ID = "";
     this.GROUP_SIZE = 0;
     this.admins = [];
@@ -18,6 +18,22 @@ export class Group {
       .filter(p => p.isAdmin || p.isSuperAdmin)
       .map(p => p.id);
     this.admins.push(this.SPOTTFEHLER);
+  }
+  
+  
+  createDb() {
+    const model = {
+      GROUP_NAME: ''
+      IS_APPROVED: '',
+      MEMBERS: [restAPI.participants < minified > ],
+      SCHEDULES: [{}]
+    }
+    
+    save to disk()
+  }
+  
+  isAdmin(sender = "") {
+    return !!this.admins.find(admin => admin === sender)
   }
   
   
