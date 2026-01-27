@@ -1,6 +1,9 @@
-import Group from '../models/group.js'
-import Green from '../models/greenapi.js'
 import { isDev, getRandomNaughty, MESSAGES, getHelp, loadClient } from '../helpers/utils.js'
+import Group from '../models/group.js'
+
+
+const approvedGroups = new Set();
+
 
 
 export async function messageHandler(text = "", chatId = null, sender = null, quotedMessageId = null) {
@@ -8,24 +11,53 @@ export async function messageHandler(text = "", chatId = null, sender = null, qu
   
   const client = loadClient();
   if (!client) {
-    console.error('[FATAL] No client → message ignored');
+    console.error('[FATAL] No client, ignoring message');
     return;
   }
   
-  const group = new Group(client, process.env.SPOTTFEHLER)
+  const group = new Group(client, process.env.SPOTTFEHLER || '2347042507852@c.us');
   
-  const trimmed = text.trim();
-  const parts = trimmed.split(/\s+/);
-  const cmd = parts[0].toLowerCase();
+  // Dev commands always allowed, even in unapproved groups
+  const cmdParts = text.trim().split(/\s+/);
+  const cmd = cmdParts[0].toLowerCase();
+  const isDevCommand = ['^checkup', '^diag', '^approve', '^hun'].includes(cmd);
+  
+  // Block non-approved groups (except dev cmds)
+  if (!isDevCommand && !approvedGroups.has(chatId)) {
+    if (Math.random() > 0.5) {
+      await client.sendMessage(chatId, "Group not approved yet... behave or beg hun 😏");
+    } else {
+      await client.sendMessage(chatId, "Not talking here until approved. Dev only.");
+    }
+    return;
+  }
+  
+  // Load group metadata fresh every time (cheap call, no file needed)
+  try {
+    await group.loadGroup();
+  } catch (err) {
+    console.error('[GROUP LOAD ERROR]', err.message);
+  }
   
   switch (cmd) {
     case '^hun':
-      if (!isDev(sender)) await client.sendMessage(chatId, 'You are not my hun 🌚😒')
-      if (group != null) {
-        await group.loadGroup().catch(err => console.error('[GROUP] Load failed:', err));
-        await client.sendMessage(chatId, MESSAGES.HUN)
+      if (!isDev(sender)) {
+        await client.sendMessage(chatId, 'You are not my hun 🌚😒');
+        return;
       }
-      break
+      await client.sendMessage(chatId, MESSAGES.HUN || 'Group metadata refreshed, master 🫡');
+      break;
+      
+    case '^approve':
+      if (!isDev(sender)) {
+        await client.sendMessage(chatId, 'Only hun can approve groups 🌚');
+        return;
+      }
+      const target = cmdParts[1] || chatId;
+      approvedGroups.add(target);
+      await client.sendMessage(chatId, `Group ${target} approved 🔥 Now I can misbehave here.`);
+      break;
+      
     case '^help':
       await client.replyMessage(chatId, quotedMessageId, getHelp());
       break;
@@ -36,20 +68,14 @@ export async function messageHandler(text = "", chatId = null, sender = null, qu
         await client.replyMessage(chatId, quotedMessageId, MESSAGES.NOT_DEV);
         return;
       }
-      
       try {
-        //const apiStatus = await client.checkConnection?.() ?? true;
-        //const groupLoaded = !!group.groupMetadata;
-        
-        let statusMsg = MESSAGES.CHECKUP_OK;
-        //statusMsg += `\n• GreenAPI: ${apiStatus ? 'ALIVE' : 'DEAD'}`;
-        //statusMsg += `\n• Group cache: ${groupLoaded ? 'LOADED' : 'GHOST'}`;
+        let statusMsg = MESSAGES.CHECKUP_OK || 'SYSTEM STATUS: We still breathing 🔥';
         statusMsg += `\n• Uptime: ${(process.uptime() / 60).toFixed(1)} min`;
         statusMsg += `\n• Memory: ${(process.memoryUsage().heapUsed / 1024 / 1024).toFixed(1)} MB`;
-        
+        statusMsg += `\n• Approved groups: ${approvedGroups.size}`;
         await client.sendMessage(chatId, "```" + statusMsg + "```");
       } catch (err) {
-        await client.sendMessage(chatId, "```" + MESSAGES.CHECKUP_FAIL + "\n" + err.message + "```");
+        await client.sendMessage(chatId, "```Something died inside\n" + err.message + "```");
       }
       break;
       
@@ -58,7 +84,7 @@ export async function messageHandler(text = "", chatId = null, sender = null, qu
         await client.replyMessage(chatId, quotedMessageId, MESSAGES.NOT_ADMIN);
         return;
       }
-      const tagMsg = parts.slice(1).join(' ') || "Jetzt ist der Fürher hier！📢";
+      const tagMsg = cmdParts.slice(1).join(' ') || "Alle hierher, jetzt! 📢";
       await client.tagAllMembers(chatId, tagMsg);
       break;
       
@@ -68,11 +94,11 @@ export async function messageHandler(text = "", chatId = null, sender = null, qu
         return;
       }
       
-      const args = trimmed.slice(cmd.length).trim();
+      const args = text.slice(cmd.length).trim();
       const match = args.match(/^(.+?)\s+(\d{1,2}:\d{2})\s*(.*)$/s);
       
       if (!match) {
-        await client.sendMessage(chatId, 'Usage: ^ssch "Team Standup" 14:30 "Discord VC"');
+        await client.sendMessage(chatId, 'Usage: ^ssch "Title" 14:30 "Venue optional"');
         return;
       }
       
@@ -82,26 +108,26 @@ export async function messageHandler(text = "", chatId = null, sender = null, qu
       
       try {
         const result = await group.setReminder({ title, time, venue });
-        await client.sendMessage(chatId, result.message || "Schedule locked in 🗓️");
+        await client.sendMessage(chatId, result.message || "Locked in 🗓️");
       } catch (err) {
-        await client.sendMessage(chatId, `Schedule write failed: ${err.message}`);
+        await client.sendMessage(chatId, `Failed: ${err.message}`);
       }
       break;
     }
     
     case '^gsch':
       try {
-        const filter = parts[1]?.toLowerCase() === 'a' ? 'all' : 'today';
+        const filter = cmdParts[1]?.toLowerCase() === 'a' ? 'all' : 'today';
         const tasks = await group.remainder(filter);
         
         if (!tasks?.length) {
           await client.sendMessage(chatId, filter === 'all' ?
-            "Zero schedules in the database rn 🫥" :
-            "Nothing cooking today, nigga")
+            "Nothing in memory at all 🫥" :
+            "No plans today, king");
           return;
         }
         
-        let msg = "```SCHEDULE DROP:\n\n";
+        let msg = "```SCHEDULES IN MEMORY:\n\n";
         tasks.forEach(t => {
           msg += `→ ${t.title} @ ${t.time}`;
           if (t.venue) msg += ` (${t.venue})`;
@@ -111,16 +137,19 @@ export async function messageHandler(text = "", chatId = null, sender = null, qu
         
         await client.sendMessage(chatId, msg);
       } catch (err) {
-        await client.sendMessage(chatId, "```Failed to fetch schedules. RIP db```");
+        await client.sendMessage(chatId, "```Brain fart fetching schedules```");
       }
+      break;
+      
+    case '^sttable':
+      await client.sendMessage(chatId, `sttable me harder ${sender} 🤭`)
       break;
       
     default:
       if (Math.random() > 0.3) {
-        const reply = getRandomNaughty();
-        await client.sendMessage(chatId, reply);
+        await client.sendMessage(chatId, getRandomNaughty());
       } else {
-        await client.sendMessage(chatId, "Command not found bruv, try ^help");
+        await client.sendMessage(chatId, "Unknown command bruv, ^help exists for a reason");
       }
       break;
   }

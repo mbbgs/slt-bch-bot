@@ -1,5 +1,8 @@
 import whatsAppClient from '@green-api/whatsapp-api-client';
 
+
+
+
 export default class GreenAPIClient {
     
     /**
@@ -19,8 +22,24 @@ export default class GreenAPIClient {
     }
     
     getInstance() {
+        const idInstance = process.env.ID_INSTANCE || '';
+        const apiTokenInstace = process.env.API_TOKEN_INSTACE || '';
+        
+        if (this.restAPI == null) {
+            this.restAPI = whatsAppClient.restAPI({
+                idInstance,
+                apiTokenInstance,
+            });
+        }
+        return this.restAPI;
+    }
+    
+    /**
+    getInstance() {
         return this.restAPI ? this.restAPI !== null : this.restAPI
     }
+    **/
+    
     /**
      * Send a plain text message to a chat or group
      * @function sendMessage
@@ -103,53 +122,7 @@ export default class GreenAPIClient {
         return sentMessages;
     }
     
-    /**
-     * Vet / lookup basic user info (name, avatar, existence) – used like !vet "234xxxxxxxxxx"
-     * @function vetUser
-     * @param {string} phoneOrChatId - Phone number or full chatId
-     * @returns {Promise<{
-     *   chatId: string,
-     *   exists: boolean,
-     *   name: string|null,
-     *   desc: string|null,
-     *   avatar: string|null
-     * }>}
-     */
-    async vetUser(phoneOrChatId) {
-        let chatId = phoneOrChatId;
-        if (!chatId.endsWith('@c.us')) {
-            chatId = chatId.replace(/[^0-9]/g, '') + '@c.us';
-        }
-        
-        try {
-            const info = await this.restAPI.contact.getContactInfo(chatId);
-            
-            let avatar = null;
-            try {
-                const avatarData = await this.restAPI.contact.getAvatar(chatId);
-                avatar = avatarData?.urlAvatar || null;
-            } catch {
-                // avatar fetch failed or doesn't exist
-            }
-            
-            return {
-                chatId,
-                exists: !!info?.existsWhatsapp,
-                name: info?.name || info?.shortName || null,
-                desc: info?.description || null,
-                avatar,
-            };
-        } catch (err) {
-            return {
-                chatId,
-                exists: false,
-                name: null,
-                desc: null,
-                avatar: null,
-            };
-        }
-        
-    }
+
     async removeUser(groupId, participant) {
         if (!groupId.endsWith('@g.us') || !participant.endsWith('@c.us')) {
             throw new Error('Invalid groupId or participant format');

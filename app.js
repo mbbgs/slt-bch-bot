@@ -79,9 +79,12 @@ app.post('/webhook', async (req, res) => {
   }
 });
 
-app.get('/health', (req, res) => {
+
+
+app.get('/ndu', (req, res) => {
   res.send('Webhook server is alive 🚀');
 });
+
 
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => {

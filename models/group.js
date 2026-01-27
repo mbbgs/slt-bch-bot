@@ -1,3 +1,6 @@
+import fs from 'fs'
+
+
 export default class Group {
   constructor(restAPI, SPOTTFEHLER = "") {
     this.restAPI = restAPI;
@@ -20,17 +23,6 @@ export default class Group {
     this.admins.push(this.SPOTTFEHLER);
   }
   
-  
-  createDb() {
-    const model = {
-      GROUP_NAME: ''
-      IS_APPROVED: '',
-      MEMBERS: [restAPI.participants < minified > ],
-      SCHEDULES: [{}]
-    }
-    
-    save to disk()
-  }
   
   isAdmin(sender = "") {
     return !!this.admins.find(admin => admin === sender)

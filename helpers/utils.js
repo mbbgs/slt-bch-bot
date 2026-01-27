@@ -54,11 +54,10 @@ function isDev(sender) {
 
 
 const NAUGHTY_EGGS = [
-  { message: "Invalid input. But your mom's inbox last night? Validated multiple times 🍑💦" }, // 13
-  { message: "Nice try. Now go practice your fingering… on the keyboard first" }, // 7 (medium spice)
-  { message: "That's not a valid command… but damn, keep talking dirty to me like that 👀" }, // 4 (light naughty)
-  { message: "Bro typed garbage & expected magic? Touch some grass… or touch yourself, I don't judge 😏" }, // 1 (light naughty)
-  { message: "Command not found. But your horny intentions? Loud and clear 🔥" } // 11? (wait — actually this was 2, but matching your list intent)
+  { message: "Invalid input. But your mom's inbox last night? Validated multiple times 🍑💦" },
+  { message: "Nice try. Now go practice your fingering… on the keyboard first" },
+  { message: "That's not a valid command… but damn, keep talking dirty to me like that 👀" },
+  { message: "Bro typed garbage & expected magic? Touch some grass… or touch yourself, I don't judge 😏" },
 ];
 
 function getRandomNaughty() {
