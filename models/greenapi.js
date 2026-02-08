@@ -2,7 +2,6 @@ import whatsAppClient from '@green-api/whatsapp-api-client';
 
 
 
-
 export default class GreenAPIClient {
     
     /**
@@ -34,11 +33,6 @@ export default class GreenAPIClient {
         return this.restAPI;
     }
     
-    /**
-    getInstance() {
-        return this.restAPI ? this.restAPI !== null : this.restAPI
-    }
-    **/
     
     /**
      * Send a plain text message to a chat or group
@@ -122,7 +116,7 @@ export default class GreenAPIClient {
         return sentMessages;
     }
     
-
+    
     async removeUser(groupId, participant) {
         if (!groupId.endsWith('@g.us') || !participant.endsWith('@c.us')) {
             throw new Error('Invalid groupId or participant format');

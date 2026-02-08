@@ -4,4 +4,5 @@ export function isGreenApi(WEBHOOK_SECRET = "") {
       return res.sendStatus(403);
     }
   }
+  return res.status(200).end()
 }
